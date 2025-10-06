@@ -168,7 +168,7 @@ int main(int argc, char **argv) {
 	VIDEO_WaitVSync();
 	if(rmode->viTVMode&VI_NON_INTERLACE) VIDEO_WaitVSync();
 
-	printf("WiiFractals / V1.0\nBy Abdelali221");
+	printf("WiiFractals / V0.1\nBy Abdelali221");
 	usleep(2000000);
 	VIDEO_ClearFrameBuffer(rmode, xfb, COLOR_BLACK);
 
