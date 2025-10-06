@@ -7,5 +7,7 @@
 # How to use :
 
 Left/Right D-Pad : select the fractal.
+
 A : Render the fractal.
+
 HOME : Exit.
