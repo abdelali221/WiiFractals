@@ -1,14 +1,36 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <gccore.h>
-#include <ogc/machine/asm.h>
-#include <ogc/machine/processor.h>
 #include <string.h>
 #include <wiiuse/wpad.h>
+#include <ogc/lwp_watchdog.h>
 
 extern void __exception_setlookupxfb(void *xfb);
 extern void __exception_setreload(int s);
 extern void usleep(u32 t);
+
+int max_iterations = 0;
+int shift = 0;
+
+int Iterations_values [] = {
+	0xff,
+	0xfff,
+	0xffff,
+	0xfffff,
+	0xffffff
+};
+
+char *Iterations_names [] = {
+	"low (fast)",
+	"medium",
+	"good",
+	"fancy (slow)",
+	"ultra (extremely slow)"
+};
+
+void POSCursor(uint8_t X, uint8_t Y) {
+	printf("\x1b[%d;%dH", Y, X);
+}
 
 char *fractalname[] = {
 	"Bifurcation",
@@ -70,17 +92,16 @@ void Bifurcation() {
 				putchar('\r');
 				if(row < 10) printf("00");
 				else if (row < 100) printf("0");
-				printf("%d,",row);
+				printf("%d, ",row);
 				if(col < 10) printf("00");
 				else if (col < 100) printf("0");
-				printf(" %d",col);
+				printf("%d",col);
             }
         }
     }
 }
 
-void Mandelbrot() {
-	int max_iterations = 655;
+u32 Mandelbrot() {
     int max_size = 4;
 	float x_min = -2.0;
     float x_max = 2.0;
@@ -101,6 +122,7 @@ void Mandelbrot() {
      * For every pixel calculate resulting value until the number becomes too
      * big, or we run out of iterations
      */
+	u32 start_time = ticks_to_millisecs(gettime());
     for (int col = 0; col < WIDTH-(WIDTH/3); col++ ) {
         for (int row = 0; row < HEIGHT; row++ ) {
             float x_square = 0.0;
@@ -108,24 +130,75 @@ void Mandelbrot() {
             float x = 0.0;
             float y = 0.0;
 
-            int color = 1;
-            while (color < max_iterations && x_square + y_square < max_size) {
+            u32 color = 0;
+            while (color < Iterations_values[max_iterations] && x_square + y_square < max_size) {
                 x_square = x * x;
                 y_square = y * y;
                 y = 2 * x * y + Q[row];
                 x = x_square - y_square + P[col];
-                color++;
+                color++; 
             }
-			writetoxfb(xfb, (row*320)+col, 1, color);
+			                
+			u8 r = (color * 5) % 255;
+            u8 g = (color * 3) % 255;
+            u8 b = (color * 1) % 255;
+			if (color == Iterations_values[max_iterations]) r = g = b = 0;
+
+			writetoxfb(xfb, (row*320)+col, 2, RGB2YCBCR(r, g, b));
 			putchar('\r');
 			if(row < 10) printf("00");
 			else if (row < 100) printf("0");
-			printf("%d,",row);
+			printf("%d, ",row);
 			if(col < 10) printf("00");
 			else if (col < 100) printf("0");
-			printf(" %d",col);
+			printf("%d",col);
         }
     }
+	u32 end_time = ticks_to_millisecs(gettime());
+	return end_time - start_time;
+}
+
+void Settings() {
+	u8 selection = 0;
+
+	printf("\x1b[2J");
+
+	POSCursor(35,7);
+
+	printf("Settings :");
+
+	POSCursor(22,10);
+
+	printf("Iteration (Quality) : ");
+	printf("%s", Iterations_names[max_iterations]);
+
+	POSCursor(0, 26);
+	printf("HOME : Go back , U/D : Select , A : Change");
+
+	while(1) {
+		WPAD_ScanPads();
+
+		int pressed = WPAD_ButtonsDown(0);
+
+		if(pressed & WPAD_BUTTON_DOWN) {
+			if (selection < 1) selection++;
+		} else if (pressed & WPAD_BUTTON_UP) {
+			if (selection > 0) selection--;
+		} else if (pressed & WPAD_BUTTON_A) {
+			switch(selection) {
+				case 0:
+					max_iterations++;
+					if(max_iterations == 5) max_iterations = 0;
+					POSCursor(22,10);
+					printf("\x1b[2KIteration (Quality) : ");
+					printf("%s", Iterations_names[max_iterations]);
+				break;
+			}
+		} else if (pressed & WPAD_BUTTON_HOME) {
+			break;
+		} 
+		VIDEO_WaitVSync();
+	}
 }
 
 //---------------------------------------------------------------------------------
@@ -168,14 +241,18 @@ int main(int argc, char **argv) {
 	VIDEO_WaitVSync();
 	if(rmode->viTVMode&VI_NON_INTERLACE) VIDEO_WaitVSync();
 
-	printf("WiiFractals / V0.1\nBy Abdelali221");
+	
+
+	printf("WiiFractals / V0.2\nBy Abdelali221");
 	usleep(2000000);
-	VIDEO_ClearFrameBuffer(rmode, xfb, COLOR_BLACK);
 
 	u8 selection = 0;
 
-	printf("\rPlease Select a fractal : %s", fractalname[selection]);
-	
+	printf("\x1b[2J\n\rPlease Select a fractal : %s", fractalname[selection]);
+	POSCursor(0, 26);
+	printf("HOME : Exit , 1 : Settings , A : Select , L/R : Change");
+	POSCursor(0, 0);
+
 	while(1) {
 		WPAD_ScanPads();
 
@@ -187,16 +264,22 @@ int main(int argc, char **argv) {
 			if (selection > 0) selection--;
 		} else if (pressed & WPAD_BUTTON_A) {
 			VIDEO_ClearFrameBuffer(rmode, xfb, COLOR_BLACK);
+			double time = 0;
 			switch(selection) {
 				case 0:
 					Bifurcation();
 				break;
 
 				case 1:
-					Mandelbrot();
+					time = Mandelbrot();
 				break;
 			}
-			printf("\rPress HOME to go back");
+			if(time) {
+				printf("\r%.3fs / Press HOME to go back", time/1000);
+			} else {
+				printf("\rPress HOME to go back");
+			}
+			
 			while(1) {
 				WPAD_ScanPads();
 				pressed = WPAD_ButtonsDown(0);
@@ -206,11 +289,17 @@ int main(int argc, char **argv) {
 			}
 			VIDEO_ClearFrameBuffer(rmode, xfb, COLOR_BLACK);
 		
+		} else if (pressed & WPAD_BUTTON_1) {
+			Settings();
+			printf("\x1b[2J");
 		} else if (pressed & WPAD_BUTTON_HOME) {
 			exit(0);
 		}
 		if(pressed) {
-			printf("\x1b[2K\rPlease Select a fractal : %s", fractalname[selection]);
+			printf("\n\x1b[2K\rPlease Select a fractal : %s", fractalname[selection]);
+			POSCursor(0, 26);
+			printf("HOME : Exit , 1 : Settings , A : Select , L/R : Change");
+			POSCursor(0, 0);
 		}
 		VIDEO_WaitVSync();
 	}
