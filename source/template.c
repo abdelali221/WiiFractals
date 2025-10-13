@@ -40,8 +40,8 @@ char *fractalname[] = {
 void *xfb = NULL;
 static GXRModeObj *rmode = NULL;
 
-#define WIDTH 480
-#define HEIGHT 480
+u16 WIDTH = 480;
+u16 HEIGHT = 480;
 
 const u32 RGB2YCBCR(u8 r1, u8 g1, u8 b1) {
 	u8 r2 = r1; u8 g2 = g1; u8 b2 = b1;
@@ -104,15 +104,19 @@ void Bifurcation() {
 u32 Mandelbrot() {
     int max_size = 4;
 	float x_min = -2.0;
-    float x_max = 2.0;
-    float y_min = -1.0;
-    float y_max = 1.0;
+    float x_max = 1.0;
+    float y_min = -1.25;
+    float y_max = 1.25;
 
     float delta_x = (x_max - x_min) / WIDTH;
     float delta_y = (y_max - y_min) / HEIGHT;
 
-    float Q[HEIGHT] = { y_max };
-    float P[WIDTH] = { x_min };
+    
+    float Q[HEIGHT];
+	for(int i = 0;i < HEIGHT;i++) Q[i] = y_max;
+    float P[WIDTH];
+	for(int i = 0;i < WIDTH;i++) P[i] = x_min;
+
     for (int row = 1; row < HEIGHT; row++)
         Q[row] = Q[row - 1] - delta_y;
     for (int col = 1; col < WIDTH; col++ )
@@ -123,7 +127,7 @@ u32 Mandelbrot() {
      * big, or we run out of iterations
      */
 	u32 start_time = ticks_to_millisecs(gettime());
-    for (int col = 0; col < WIDTH-(WIDTH/3); col++ ) {
+    for (int col = 0; col < WIDTH; col++ ) {
         for (int row = 0; row < HEIGHT; row++ ) {
             float x_square = 0.0;
             float y_square = 0.0;
@@ -144,7 +148,7 @@ u32 Mandelbrot() {
             u8 b = (color * 1) % 255;
 			if (color == Iterations_values[max_iterations]) r = g = b = 0;
 
-			writetoxfb(xfb, (row*320)+col, 2, RGB2YCBCR(r, g, b));
+			writetoxfb(xfb, (row*WIDTH)+col, 2, RGB2YCBCR(r, g, b));
 			putchar('\r');
 			if(row < 10) printf("00");
 			else if (row < 100) printf("0");
@@ -211,6 +215,9 @@ int main(int argc, char **argv) {
 	// Obtain the preferred video mode from the system
 	// This will correspond to the settings in the Wii menu
 	rmode = VIDEO_GetPreferredMode(NULL);
+
+	WIDTH = rmode->viWidth / 2;
+	HEIGHT = rmode->viHeight;
 
 	// Allocate memory for the display in the uncached region
 	xfb = MEM_K0_TO_K1(SYS_AllocateFramebuffer(rmode));
