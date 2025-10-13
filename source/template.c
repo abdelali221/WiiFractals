@@ -110,7 +110,6 @@ u32 Mandelbrot() {
 
     float delta_x = (x_max - x_min) / WIDTH;
     float delta_y = (y_max - y_min) / HEIGHT;
-
     
     float Q[HEIGHT];
 	for(int i = 0;i < HEIGHT;i++) Q[i] = y_max;
@@ -250,7 +249,7 @@ int main(int argc, char **argv) {
 
 	
 
-	printf("WiiFractals / V0.2\nBy Abdelali221");
+	printf("WiiFractals / V1.0\nBy Abdelali221");
 	usleep(2000000);
 
 	u8 selection = 0;
