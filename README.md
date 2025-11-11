@@ -11,3 +11,5 @@ Left/Right D-Pad : select the fractal.
 A : Render the fractal.
 
 HOME : Exit.
+
+Software brought to you by Abdelali221.
